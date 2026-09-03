@@ -45,7 +45,11 @@ def write_run_metadata(
 
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "resolved_config.yaml").write_text(
-        yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+        yaml.safe_dump(
+            json.loads(json.dumps(config, default=str)),
+            allow_unicode=True,
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
     metadata: dict[str, Any] = {
