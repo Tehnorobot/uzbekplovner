@@ -1,0 +1,13 @@
+{
+    "name": "ner-uz-experiments",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "remoteEnv": {
+        // Ensure venv is always first in PATH
+        "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}"
+    },
+    "postCreateCommand": "uv sync --extra dev",
+    "remoteUser": "vscode"
+}

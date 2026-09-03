@@ -1,0 +1,39 @@
+experiment:
+  name: exp_baseline
+  version: "1.0"
+
+paths:
+  train: data/train.jsonl
+  dev: data/dev.jsonl
+  inference_input: data/dev.jsonl
+  model_dir: exps/exp_baseline/artifacts/model
+  runs_dir: exps/exp_baseline/artifacts/runs
+
+model:
+  name: distilbert/distilbert-base-multilingual-cased
+
+training:
+  epochs: 3
+  batch_size: 8
+  gradient_accumulation_steps: 1
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  max_grad_norm: 1.0
+  max_length: 256
+  stride: 64
+  seed: 42
+  device: auto
+  num_workers: 0
+  resume: null
+
+inference:
+  input: data/dev.jsonl
+  output: null
+  batch_size: 16
+  device: auto
+
+service:
+  host: 0.0.0.0
+  port: 8000
+  device: auto
