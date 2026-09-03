@@ -1,8 +1,7 @@
 # NER experiments
 
 Воспроизводимый проект NER для узбекских, русских, английских и смешанных
-текстов. Внешний контракт соответствует комплекту `ner_uz_hackathon_participant`:
-классы `ORG`, `NAME`, `GEO`, exact-span offsets в Unicode и HTTP API.
+текстов.
 
 ## Быстрый старт
 
