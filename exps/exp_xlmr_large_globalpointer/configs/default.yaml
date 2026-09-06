@@ -1,0 +1,54 @@
+experiment:
+  name: exp_xlmr_large_globalpointer
+  version: "1.0"
+
+paths:
+  train: data/merged_mendeley_uzner_v2_empty75/train.jsonl
+  dev: data/merged_mendeley_uzner_v2_empty75/dev.jsonl
+  inference_input: data/test_inputs.jsonl
+  model_dir: exps/exp_xlmr_large_globalpointer/artifacts/model
+  runs_dir: exps/exp_xlmr_large_globalpointer/artifacts/runs
+
+model:
+  name: FacebookAI/xlm-roberta-large
+  dropout: 0.1
+
+training:
+  epochs: 7
+  batch_size: 16
+  gradient_accumulation_steps: 1
+  learning_rate: 1.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  max_grad_norm: 1.0
+  max_length: 512
+  stride: 128
+  seed: 42
+  device: auto
+  num_workers: 0
+  use_amp: true
+  evaluate_train_each_epoch: true
+  resume: null
+
+global_pointer:
+  head_size: 128
+  threshold: 0.0
+
+augmentation:
+  enabled: true
+  probability: 0.15
+  num_clusters: 16
+  max_candidates: 3
+
+inference:
+  output: null
+  batch_size: 16
+  device: auto
+
+normalization:
+  aliases: {}
+
+service:
+  host: 0.0.0.0
+  port: 8000
+  device: auto

@@ -11,6 +11,20 @@ from typing import Any
 import yaml
 
 
+def _yaml_value(value: Any) -> Any:
+    """Convert pathlib values in a config into YAML-safe values."""
+
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _yaml_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_yaml_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_yaml_value(item) for item in value)
+    return value
+
+
 def sha256_file(path: Path) -> str:
     """Return the SHA-256 digest of a file."""
 
@@ -45,7 +59,7 @@ def write_run_metadata(
 
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "resolved_config.yaml").write_text(
-        yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+        yaml.safe_dump(_yaml_value(config), allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
     metadata: dict[str, Any] = {

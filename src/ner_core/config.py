@@ -96,13 +96,27 @@ class TrainingConfig(BaseConfig):
     resume: Path | None = None
 
 
+class AugmentationConfig(BaseConfig):
+    """Optional cluster-based training data augmentation settings."""
+
+    enabled: bool = False
+    probability: float = Field(default=0.0, ge=0, le=1)
+    num_clusters: int = Field(default=8, ge=1)
+    max_candidates: int = Field(default=5, ge=1)
+
+
 class InferenceConfig(BaseConfig):
     """Batch inference settings."""
 
-    input: Path = Path("data/dev.jsonl")
     output: Path | None = None
     batch_size: int = Field(default=16, ge=1)
     device: Literal["auto", "cpu", "cuda"] = "auto"
+
+
+class NormalizationConfig(BaseConfig):
+    """Canonical aliases used by the optional normalized prediction endpoint."""
+
+    aliases: dict[Literal["ORG", "NAME", "GEO"], dict[str, str]] = Field(default_factory=dict)
 
 
 class ServiceConfig(BaseConfig):
@@ -120,7 +134,9 @@ class ExperimentConfig(BaseConfig):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
+    augmentation: AugmentationConfig = Field(default_factory=AugmentationConfig)
     inference: InferenceConfig = Field(default_factory=InferenceConfig)
+    normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
     service: ServiceConfig = Field(default_factory=ServiceConfig)
 
 

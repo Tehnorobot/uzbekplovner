@@ -19,12 +19,25 @@ COPY src ./src
 COPY scripts ./scripts
 COPY exps ./exps
 
-# The current experiment model is intentionally checked during build. This
-# prevents an image that downloads a model after startup.
-RUN if [ ! -d "/app/exps/${EXP_NAME}/artifacts/model" ] || \
-       [ ! -f "/app/exps/${EXP_NAME}/artifacts/model/config.json" ] || \
-       [ ! -f "/app/exps/${EXP_NAME}/artifacts/model/tokenizer_config.json" ]; then \
-      echo "ERROR: model is missing for ${EXP_NAME}; run training first" >&2; \
+# Accept the flat token-classification bundle or the nested GlobalPointer
+# bundle. Both checks guarantee that startup never needs a model download.
+RUN model_dir="/app/exps/${EXP_NAME}/artifacts/model"; \
+    flat_bundle=false; \
+    pointer_bundle=false; \
+    if [ -f "${model_dir}/config.json" ] && \
+       [ -f "${model_dir}/tokenizer_config.json" ]; then \
+      flat_bundle=true; \
+    fi; \
+    if [ -f "${model_dir}/model_config.json" ] && \
+       [ -f "${model_dir}/pointer_state.pt" ] && \
+       [ -f "${model_dir}/encoder/config.json" ] && \
+       [ -f "${model_dir}/tokenizer/tokenizer_config.json" ] && \
+       { [ -f "${model_dir}/encoder/model.safetensors" ] || \
+         [ -f "${model_dir}/encoder/pytorch_model.bin" ]; }; then \
+      pointer_bundle=true; \
+    fi; \
+    if [ "${flat_bundle}" != true ] && [ "${pointer_bundle}" != true ]; then \
+      echo "ERROR: inference model bundle is missing for ${EXP_NAME}" >&2; \
       exit 1; \
     fi
 

@@ -5,7 +5,9 @@ __pycache__/
 .ruff_cache/
 .env
 
-exps/*/artifacts/runs/
+exps/*/artifacts/*
 *.log
 
-useful_files/*
+useful_files
+artifacts
+data

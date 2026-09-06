@@ -37,7 +37,8 @@ def _train_args(config: dict[str, Any], context: ExperimentContext) -> Namespace
         num_workers=int(training["num_workers"]),
         max_train_records=None,
         max_dev_records=None,
-        overwrite_output_dir=bool(training.get("resume")),
+        # The common runner writes run metadata before the training stage starts.
+        overwrite_output_dir=True,
         resume=(
             (context.root_dir / Path(training["resume"])).resolve()
             if training.get("resume") and not Path(training["resume"]).is_absolute()
@@ -45,6 +46,12 @@ def _train_args(config: dict[str, Any], context: ExperimentContext) -> Namespace
             if training.get("resume")
             else None
         ),
+        augmentation={
+            "enabled": bool(config.get("augmentation", {}).get("enabled", False)),
+            "probability": float(config.get("augmentation", {}).get("probability", 0.0)),
+            "num_clusters": int(config.get("augmentation", {}).get("num_clusters", 8)),
+            "max_candidates": int(config.get("augmentation", {}).get("max_candidates", 5)),
+        },
     )
 
 
@@ -174,7 +181,10 @@ def serve(config: dict[str, Any], context: ExperimentContext) -> None:
 
     predictor = build_predictor(config, context)
     service = config["service"]
-    app = create_app(predictor)
+    app = create_app(
+        predictor,
+        normalization_aliases=config.get("normalization", {}).get("aliases", {}),
+    )
     uvicorn.run(
         app,
         host=str(service.get("host", "0.0.0.0")),
