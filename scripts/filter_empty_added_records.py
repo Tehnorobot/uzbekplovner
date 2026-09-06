@@ -69,11 +69,7 @@ def _source_prefix(record_hash: str, added_prefixes: tuple[str, ...]) -> str | N
 def _entity_counts(records: list[JsonObject]) -> dict[str, int]:
     """Count retained target entities by label."""
 
-    counts = Counter(
-        entity["label"]
-        for record in records
-        for entity in record["entities"]
-    )
+    counts = Counter(entity["label"] for record in records for entity in record["entities"])
     return dict(sorted(counts.items()))
 
 

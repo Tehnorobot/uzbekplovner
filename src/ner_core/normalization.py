@@ -20,7 +20,7 @@ _APOSTROPHE_TRANSLATION = str.maketrans(
         "ʹ": "'",
     }
 )
-_EDGE_PUNCTUATION = " \t\r\n.,;:!?()[]{}\"«»“”"
+_EDGE_PUNCTUATION = ' \t\r\n.,;:!?()[]{}"«»“”'
 
 
 def clean_entity_value(value: str) -> str:

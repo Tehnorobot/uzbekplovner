@@ -111,9 +111,7 @@ def _make_augmented_record(
         entity_start = output_cursor
         parts.append(surface)
         output_cursor += len(surface)
-        entities.append(
-            {"label": entity["label"], "start": entity_start, "end": output_cursor}
-        )
+        entities.append({"label": entity["label"], "start": entity_start, "end": output_cursor})
         source_cursor = end
     parts.append(record["text"][source_cursor:])
     augmented_text = "".join(parts)

@@ -111,9 +111,7 @@ def train_epoch(
             scaled_loss = loss / group_size
         scaler.scale(scaled_loss).backward()
 
-        should_update = (
-            batch_index % gradient_accumulation_steps == 0 or batch_index == len(loader)
-        )
+        should_update = batch_index % gradient_accumulation_steps == 0 or batch_index == len(loader)
         if should_update:
             scaler.unscale_(optimizer)
             clip_grad_norm_(model.parameters(), max_grad_norm)
@@ -157,16 +155,14 @@ def exact_span_metrics(
         record["hash"]: {
             "text": record["text"],
             "entities": {
-                (entity["label"], entity["start"], entity["end"])
-                for entity in record["entities"]
+                (entity["label"], entity["start"], entity["end"]) for entity in record["entities"]
             },
         }
         for record in gold_records
     }
     predicted = {
         record["hash"]: {
-            (entity["label"], entity["start"], entity["end"])
-            for entity in record["entities"]
+            (entity["label"], entity["start"], entity["end"]) for entity in record["entities"]
         }
         for record in predictions
     }

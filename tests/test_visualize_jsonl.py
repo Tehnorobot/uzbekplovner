@@ -4,9 +4,9 @@ import pytest
 
 from scripts.visualize_jsonl import (
     load_comparison_records,
+    read_records,
     render_comparison_text,
     render_svg,
-    read_records,
     render_text,
 )
 
@@ -18,9 +18,7 @@ def test_render_text_marks_entities_and_keeps_offsets() -> None:
         {"label": "GEO", "start": 4, "end": 14},
     ]
 
-    assert render_text(text, entities, color=False) == (
-        "[NAME:Ali] [GEO:Toshkentda] ishlaydi."
-    )
+    assert render_text(text, entities, color=False) == ("[NAME:Ali] [GEO:Toshkentda] ishlaydi.")
 
 
 def test_read_records_rejects_invalid_offsets(tmp_path) -> None:

@@ -1,10 +1,10 @@
 """Print a random sample of project NER JSONL records with highlighted entities."""
 
 import argparse
-from html import escape
 import json
 import random
 import sys
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -210,9 +210,7 @@ def load_comparison_records(gold_path: Path, predictions_path: Path) -> list[Jso
                 text,
                 f"{predictions_path}:{record['hash']}/entities[{entity_index}]",
             )
-        predicted_spans = sorted(
-            (entity["start"], entity["end"]) for entity in predicted_entities
-        )
+        predicted_spans = sorted((entity["start"], entity["end"]) for entity in predicted_entities)
         if any(
             right[0] < left[1]
             for left, right in zip(predicted_spans, predicted_spans[1:], strict=False)
@@ -318,11 +316,7 @@ def _comparison_segments(
             None,
         )
         predicted = next(
-            (
-                entity
-                for entity in predicted_entities
-                if entity["start"] <= start < entity["end"]
-            ),
+            (entity for entity in predicted_entities if entity["start"] <= start < entity["end"]),
             None,
         )
         if gold is not None and predicted is not None:
@@ -374,8 +368,7 @@ def format_comparison_record(
     predicted_entities = record["pred_entities"]
     lines = [
         f"=== Sample {index}/{total} | hash={record['hash']} ===",
-        "Legend: green=correct, red=missed, blue=false positive, "
-        "yellow=boundary or label error",
+        "Legend: green=correct, red=missed, blue=false positive, yellow=boundary or label error",
         "Text: "
         + render_comparison_text(
             text,
@@ -489,11 +482,7 @@ def render_svg(records: list[JsonObject]) -> str:
         lines = _wrap_svg_segments(text_segments)
         comparison_details_height = 48 if comparison else 0
         block_height = (
-            58
-            + len(lines) * 27
-            + comparison_details_height
-            + max(1, entity_lines) * 24
-            + 20
+            58 + len(lines) * 27 + comparison_details_height + max(1, entity_lines) * 24 + 20
         )
         top = y - 27
         blocks.append(
@@ -551,9 +540,7 @@ def render_svg(records: list[JsonObject]) -> str:
             )
             y += 24
         else:
-            for entity in sorted(
-                record["entities"], key=lambda item: (item["start"], item["end"])
-            ):
+            for entity in sorted(record["entities"], key=lambda item: (item["start"], item["end"])):
                 start = int(entity["start"])
                 end = int(entity["end"])
                 label = escape(str(entity["label"]))
@@ -570,9 +557,7 @@ def render_svg(records: list[JsonObject]) -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
         f'viewBox="0 0 {width} {height}">'
-        '<rect width="100%" height="100%" fill="white"/>'
-        + "".join(blocks)
-        + "</svg>\n"
+        '<rect width="100%" height="100%" fill="white"/>' + "".join(blocks) + "</svg>\n"
     )
 
 

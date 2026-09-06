@@ -21,9 +21,7 @@ class TwoWindowTokenizer:
 def test_efficient_global_pointer_masks_invalid_and_reverse_spans() -> None:
     head = EfficientGlobalPointer(hidden_size=8, num_labels=3, head_size=4)
     hidden = torch.randn(2, 5, 8)
-    span_mask = torch.tensor(
-        [[False, True, True, True, False], [False, True, True, False, False]]
-    )
+    span_mask = torch.tensor([[False, True, True, True, False], [False, True, True, False, False]])
 
     logits = head(hidden, span_mask)
 

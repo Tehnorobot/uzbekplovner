@@ -128,9 +128,7 @@ def _replacement(
     if cluster_index is None:
         return None
     candidates = [
-        candidate
-        for candidate in clusters.get((label, cluster_index), [])
-        if candidate != source
+        candidate for candidate in clusters.get((label, cluster_index), []) if candidate != source
     ]
     if not candidates:
         return None

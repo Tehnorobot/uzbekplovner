@@ -45,8 +45,7 @@ def select_non_overlapping(candidates: list[JsonObject]) -> list[JsonObject]:
         selected.append(candidate)
     selected.sort(key=lambda item: (item["start"], item["end"], item["label"]))
     return [
-        {"label": item["label"], "start": item["start"], "end": item["end"]}
-        for item in selected
+        {"label": item["label"], "start": item["start"], "end": item["end"]} for item in selected
     ]
 
 
@@ -85,12 +84,16 @@ def predict_records(
             )
         batch["span_mask"] = span_mask
         batch = _move_batch(batch, device)
-        logits = model(
-            input_ids=batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-            token_type_ids=batch.get("token_type_ids"),
-            span_mask=batch["span_mask"],
-        ).float().cpu()
+        logits = (
+            model(
+                input_ids=batch["input_ids"],
+                attention_mask=batch["attention_mask"],
+                token_type_ids=batch.get("token_type_ids"),
+                span_mask=batch["span_mask"],
+            )
+            .float()
+            .cpu()
+        )
 
         for row, (record_index, _, offsets) in enumerate(items):
             positive = torch.nonzero(logits[row] > threshold, as_tuple=False)
@@ -128,7 +131,5 @@ def predict_records(
             {"label": label, "start": start, "end": end, "score": score}
             for (label, start, end), score in spans.items()
         ]
-        predictions.append(
-            {"hash": record["hash"], "entities": select_non_overlapping(candidates)}
-        )
+        predictions.append({"hash": record["hash"], "entities": select_non_overlapping(candidates)})
     return predictions

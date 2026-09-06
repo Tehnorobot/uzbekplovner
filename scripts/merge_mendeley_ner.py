@@ -9,16 +9,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-
 TARGET_LABELS = ("ORG", "NAME", "GEO")
 SOURCE_TO_TARGET = {
     "PER": "NAME",
     "LOC": "GEO",
     "ORG": "ORG",
 }
-DEFAULT_ARCHIVE = Path(
-    "useful_files/A Multi-Source Synthetic Dataset for Uzbek Sentime.zip"
-)
+DEFAULT_ARCHIVE = Path("useful_files/A Multi-Source Synthetic Dataset for Uzbek Sentime.zip")
 DEFAULT_OUTPUT_DIR = Path("data/merged_mendeley_v5")
 DEFAULT_MEMBER_SUFFIX = "synthetic_dataset_10000_v6.jsonl"
 ENTITY_CONTINUATION_CHARS = frozenset("'’ʻʼ-_")
@@ -147,7 +144,7 @@ def parse_source_arrays(record: JsonObject, source: str) -> tuple[list[str], lis
 def make_source_hash(source_id: Any, text: str) -> str:
     """Create a deterministic project-compatible hash for an external record."""
 
-    payload = f"{source_id}\0{text}".encode("utf-8")
+    payload = f"{source_id}\0{text}".encode()
     return f"mendeley-{hashlib.sha256(payload).hexdigest()}"
 
 
@@ -202,9 +199,7 @@ def assign_source_occurrences(text: str, surfaces: list[str]) -> dict[int, tuple
 def expand_attached_suffix(text: str, end: int) -> int:
     """Include a suffix attached to an entity according to the project guide."""
 
-    while end < len(text) and (
-        text[end].isalnum() or text[end] in ENTITY_CONTINUATION_CHARS
-    ):
+    while end < len(text) and (text[end].isalnum() or text[end] in ENTITY_CONTINUATION_CHARS):
         end += 1
     return end
 
@@ -247,7 +242,7 @@ def convert_source_record(
 
     entities: list[JsonObject] = []
     assignments = assign_source_occurrences(text, surfaces)
-    for index, (surface, source_label) in enumerate(zip(surfaces, source_labels, strict=True)):
+    for index, (_surface, source_label) in enumerate(zip(surfaces, source_labels, strict=True)):
         start, surface_end = assignments[index]
         end = expand_attached_suffix(text, surface_end)
         source_label = source_label.upper()
@@ -337,9 +332,7 @@ def prepare_output_dir(path: Path, overwrite: bool) -> None:
     if path.exists() and not path.is_dir():
         raise NotADirectoryError(path)
     if path.exists() and any(path.iterdir()) and not overwrite:
-        raise FileExistsError(
-            f"output directory is not empty: {path}; use --overwrite to reuse it"
-        )
+        raise FileExistsError(f"output directory is not empty: {path}; use --overwrite to reuse it")
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -357,9 +350,7 @@ def build_manifest(
     """Build an auditable description of the merge result."""
 
     entity_counts = Counter(
-        entity["label"]
-        for record in external_records
-        for entity in record["entities"]
+        entity["label"] for record in external_records for entity in record["entities"]
     )
     return {
         "schema_version": 1,
@@ -373,7 +364,8 @@ def build_manifest(
         "policy": "append converted external records to train; keep original dev unchanged",
         "label_mapping": SOURCE_TO_TARGET,
         "span_policy": (
-            "include alphanumeric and apostrophe/hyphen suffixes attached directly to a source surface form"
+            "include alphanumeric and apostrophe/hyphen suffixes attached "
+            "directly to a source surface form"
         ),
         "dropped_source_labels": sorted(
             key.removeprefix("dropped_label:")

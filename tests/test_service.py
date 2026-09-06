@@ -54,9 +54,7 @@ def test_normalized_endpoint_adds_surface_and_canonical_value() -> None:
     regular = client.post("/api/v1/predict", json=request)
     normalized = client.post("/api/v1/predict/normalized", json=request)
 
-    assert regular.json()["data"][0]["entities"] == [
-        {"label": "GEO", "start": 0, "end": 10}
-    ]
+    assert regular.json()["data"][0]["entities"] == [{"label": "GEO", "start": 0, "end": 10}]
     assert normalized.status_code == 200
     assert normalized.json()["data"][0]["entities"] == [
         {

@@ -109,10 +109,7 @@ def build_span_mask(
 
     return [
         start != end
-        and not any(
-            start < entity["end"] and end > entity["start"]
-            for entity in partial_entities
-        )
+        and not any(start < entity["end"] and end > entity["start"] for entity in partial_entities)
         for start, end in offsets
     ]
 
@@ -206,8 +203,7 @@ class GlobalPointerDataset(Dataset):
             raise ValueError(f"{description}: tokenization produced no trainable windows")
         for record_index, record in enumerate(records):
             expected = {
-                (entity["label"], entity["start"], entity["end"])
-                for entity in record["entities"]
+                (entity["label"], entity["start"], entity["end"]) for entity in record["entities"]
             }
             missing = expected - represented[record_index]
             if missing:

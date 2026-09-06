@@ -7,9 +7,7 @@ def _record(record_hash: str, *, empty: bool) -> dict[str, object]:
     return {
         "hash": record_hash,
         "text": "Ali",
-        "entities": []
-        if empty
-        else [{"label": "NAME", "start": 0, "end": 3}],
+        "entities": [] if empty else [{"label": "NAME", "start": 0, "end": 3}],
     }
 
 

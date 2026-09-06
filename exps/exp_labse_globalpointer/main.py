@@ -127,9 +127,7 @@ def evaluate(config: dict[str, Any], context: ExperimentContext) -> Path:
     )
     write_jsonl(prediction_path, predictor(records))
     metrics = evaluate_files(gold_path, prediction_path)
-    metrics_path = (context.run_dir or context.experiment_dir / "artifacts") / (
-        "dev_metrics.json"
-    )
+    metrics_path = (context.run_dir or context.experiment_dir / "artifacts") / ("dev_metrics.json")
     write_metrics(metrics_path, metrics)
     print_metrics(metrics)
     print(f"Predictions: {prediction_path}")

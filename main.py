@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT_DIR / "src"))
 from ner_core.config import BootstrapSettings  # noqa: E402
 from ner_core.runner import dispatch  # noqa: E402
 
+
 def parse_args() -> argparse.Namespace:
     """Parse common runner options."""
 
