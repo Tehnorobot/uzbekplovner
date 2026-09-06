@@ -138,7 +138,7 @@ def evaluate_loss(
     model.eval()
     weighted_loss = 0.0
     token_count = 0
-    for batch in tqdm(loader, desc="Dev loss", unit="batch", leave=False):
+    for batch in tqdm(loader, desc="Dev loss", unit="batch", leave=True):
         batch = _move_batch(batch, device)
         output = model(**batch)
         weight = _loss_weight(batch)
@@ -236,7 +236,7 @@ def train_epoch(
     weighted_loss = 0.0
     token_count = 0
 
-    progress = tqdm(loader, desc="Train", unit="batch", leave=False)
+    progress = tqdm(loader, desc="Train", unit="batch", leave=True)
     for batch_index, batch in enumerate(progress, start=1):
         batch = _move_batch(batch, device)
         output = model(**batch)
@@ -443,6 +443,8 @@ def run(args: argparse.Namespace) -> Path:
         },
     }
     for epoch in range(start_epoch, args.epochs + 1):
+        print(f"\n===== Epoch {epoch}/{args.epochs} =====", flush=True)
+        print("Training...", flush=True)
         train_loss = train_epoch(
             model,
             train_loader,
@@ -452,7 +454,11 @@ def run(args: argparse.Namespace) -> Path:
             gradient_accumulation_steps=args.gradient_accumulation_steps,
             max_grad_norm=args.max_grad_norm,
         )
+        print(f"Train finished. train_loss={train_loss:.6f}", flush=True)
+
+        print("Running validation...", flush=True)
         dev_loss = evaluate_loss(model, dev_loader, device)
+        print(f"Validation finished. dev_loss={dev_loss:.6f}", flush=True)
         train_metrics = evaluate_entity_metrics(
             model,
             tokenizer,
@@ -482,7 +488,10 @@ def run(args: argparse.Namespace) -> Path:
         print_epoch_metrics(epoch, train_loss, train_metrics, dev_loss, val_metrics)
         if dev_loss < best_dev_loss:
             best_dev_loss = dev_loss
+            print("Saving best model...", flush=True)
             _save_model(model, tokenizer, model_dir, baseline_config)
+            print("Best model saved.", flush=True)
+        print("Saving checkpoint...", flush=True)
         torch.save(
             _checkpoint_state(
                 model,
@@ -508,6 +517,7 @@ def run(args: argparse.Namespace) -> Path:
             + "\n",
             encoding="utf-8",
         )
+        print("Checkpoint saved.", flush=True)
 
     if not model_dir.exists():
         _save_model(model, tokenizer, model_dir, baseline_config)
