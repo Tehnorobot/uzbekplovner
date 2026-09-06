@@ -16,3 +16,26 @@ def test_pydantic_validates_training_constraints() -> None:
 
     with pytest.raises(ValueError):
         ExperimentConfig.model_validate({"training": {"epochs": 0}})
+
+
+def test_pydantic_validates_cluster_augmentation_settings() -> None:
+    config = ExperimentConfig.model_validate(
+        {"augmentation": {"enabled": True, "probability": 0.25}}
+    )
+    assert config.augmentation.enabled is True
+    assert config.augmentation.probability == 0.25
+
+    with pytest.raises(ValueError):
+        ExperimentConfig.model_validate({"augmentation": {"probability": 1.1}})
+
+
+def test_pydantic_validates_normalization_alias_labels() -> None:
+    config = ExperimentConfig.model_validate(
+        {"normalization": {"aliases": {"GEO": {"Toshkentda": "Toshkent"}}}}
+    )
+    assert config.normalization.aliases["GEO"]["Toshkentda"] == "Toshkent"
+
+    with pytest.raises(ValueError):
+        ExperimentConfig.model_validate(
+            {"normalization": {"aliases": {"UNKNOWN": {"value": "canonical"}}}}
+        )

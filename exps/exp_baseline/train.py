@@ -16,6 +16,9 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+from ner_core.contracts import write_jsonl
+
+from .cluster_augmentation import apply_cluster_augmentation
 from .common import (
     DEFAULT_MAX_LENGTH,
     DEFAULT_MODEL,
@@ -90,6 +93,16 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise ValueError("warmup-ratio must be in [0, 1)")
     if args.max_grad_norm <= 0:
         raise ValueError("max-grad-norm must be positive")
+    augmentation = getattr(args, "augmentation", {})
+    if not isinstance(augmentation, dict):
+        raise ValueError("augmentation must be a mapping")
+    probability = float(augmentation.get("probability", 0.0))
+    if not 0.0 <= probability <= 1.0:
+        raise ValueError("augmentation probability must be in [0, 1]")
+    if int(augmentation.get("num_clusters", 8)) < 1:
+        raise ValueError("augmentation num_clusters must be positive")
+    if int(augmentation.get("max_candidates", 5)) < 1:
+        raise ValueError("augmentation max_candidates must be positive")
 
 
 def _prepare_output_dir(path: Path, overwrite: bool) -> None:
@@ -134,6 +147,76 @@ def evaluate_loss(
     if not token_count:
         raise RuntimeError("dev dataset contains no labeled tokens")
     return weighted_loss / token_count
+
+
+@torch.inference_mode()
+def evaluate_entity_metrics(
+    model: torch.nn.Module,
+    tokenizer: Any,
+    records: list[dict[str, Any]],
+    *,
+    max_length: int,
+    stride: int,
+    batch_size: int,
+    device: torch.device,
+) -> dict[str, Any]:
+    """Calculate exact-span metrics for one split using the current model."""
+
+    from scripts.evaluate import calculate_metrics
+
+    from . import predict as baseline_predict
+
+    windows = baseline_predict._build_windows(
+        records,
+        tokenizer,
+        max_length=max_length,
+        stride=stride,
+    )
+    scores = baseline_predict._predict_token_scores(
+        model,
+        tokenizer,
+        windows,
+        len(records),
+        batch_size=batch_size,
+        device=device,
+    )
+    id2label = baseline_predict._model_labels(model)
+    predictions = baseline_predict._decode_records(records, scores, id2label)
+
+    gold = {
+        record["hash"]: {
+            "text": record["text"],
+            "entities": {
+                (entity["label"], entity["start"], entity["end"]) for entity in record["entities"]
+            },
+        }
+        for record in records
+    }
+    predicted = {
+        record["hash"]: {
+            (entity["label"], entity["start"], entity["end"]) for entity in record["entities"]
+        }
+        for record in predictions
+    }
+    return calculate_metrics(gold, predicted)
+
+
+def print_epoch_metrics(
+    epoch: int,
+    train_loss: float,
+    train_metrics: dict[str, Any],
+    val_loss: float,
+    val_metrics: dict[str, Any],
+) -> None:
+    """Print loss and complete exact-span metrics for both data splits."""
+
+    from scripts.evaluate import print_metrics
+
+    print(f"Epoch {epoch}: train_loss={train_loss:.6f}, val_loss={val_loss:.6f}")
+    print("Train exact-span metrics:")
+    print_metrics(train_metrics)
+    print("Validation exact-span metrics:")
+    print_metrics(val_metrics)
 
 
 def train_epoch(
@@ -204,7 +287,7 @@ def _checkpoint_state(
     generator: torch.Generator,
     epoch: int,
     best_dev_loss: float,
-    history: list[dict[str, float | int]],
+    history: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Collect all state needed to continue training deterministically."""
 
@@ -246,6 +329,34 @@ def run(args: argparse.Namespace) -> Path:
     tokenizer = load_fast_tokenizer(args.model_name)
     validate_window(tokenizer, args.max_length, args.stride)
 
+    id2label = dict(enumerate(TAGS))
+    label2id = {tag: index for index, tag in id2label.items()}
+    model = AutoModelForTokenClassification.from_pretrained(
+        args.model_name,
+        num_labels=len(TAGS),
+        id2label=id2label,
+        label2id=label2id,
+    ).to(device)
+    input_train_records = len(train_records)
+    augmentation_config = getattr(args, "augmentation", {})
+    train_records, augmentation_stats = apply_cluster_augmentation(
+        train_records,
+        tokenizer,
+        model,
+        enabled=bool(augmentation_config.get("enabled", False)),
+        probability=float(augmentation_config.get("probability", 0.0)),
+        num_clusters=int(augmentation_config.get("num_clusters", 8)),
+        max_candidates=int(augmentation_config.get("max_candidates", 5)),
+        seed=args.seed,
+    )
+    if augmentation_stats["added_records"]:
+        write_jsonl(output_dir / "augmented_train.jsonl", train_records)
+        print(
+            "Cluster augmentation: "
+            f"added={augmentation_stats['added_records']}, "
+            f"replaced_entities={augmentation_stats['replaced_entities']}"
+        )
+
     train_dataset = TokenizedNerDataset(
         train_records,
         tokenizer,
@@ -279,14 +390,6 @@ def run(args: argparse.Namespace) -> Path:
         num_workers=args.num_workers,
     )
 
-    id2label = dict(enumerate(TAGS))
-    label2id = {tag: index for index, tag in id2label.items()}
-    model = AutoModelForTokenClassification.from_pretrained(
-        args.model_name,
-        num_labels=len(TAGS),
-        id2label=id2label,
-        label2id=label2id,
-    ).to(device)
     optimizer = AdamW(
         model.parameters(),
         lr=args.learning_rate,
@@ -302,7 +405,7 @@ def run(args: argparse.Namespace) -> Path:
     )
 
     start_epoch = 1
-    history: list[dict[str, float | int]] = []
+    history: list[dict[str, Any]] = []
     best_dev_loss = float("inf")
     if args.resume is not None:
         checkpoint_path = args.resume.expanduser().resolve()
@@ -332,6 +435,12 @@ def run(args: argparse.Namespace) -> Path:
         "max_length": args.max_length,
         "stride": args.stride,
         "seed": args.seed,
+        "augmentation": {
+            "enabled": bool(augmentation_config.get("enabled", False)),
+            "probability": float(augmentation_config.get("probability", 0.0)),
+            "num_clusters": int(augmentation_config.get("num_clusters", 8)),
+            "max_candidates": int(augmentation_config.get("max_candidates", 5)),
+        },
     }
     for epoch in range(start_epoch, args.epochs + 1):
         print(f"\n===== Epoch {epoch}/{args.epochs} =====", flush=True)
@@ -350,11 +459,33 @@ def run(args: argparse.Namespace) -> Path:
         print("Running validation...", flush=True)
         dev_loss = evaluate_loss(model, dev_loader, device)
         print(f"Validation finished. dev_loss={dev_loss:.6f}", flush=True)
-        history.append({"epoch": epoch, "train_loss": train_loss, "dev_loss": dev_loss})
-        print(
-            f"Epoch {epoch}: train_loss={train_loss:.6f}, dev_loss={dev_loss:.6f}",
-            flush=True,
+        train_metrics = evaluate_entity_metrics(
+            model,
+            tokenizer,
+            train_records,
+            max_length=args.max_length,
+            stride=args.stride,
+            batch_size=args.batch_size,
+            device=device,
         )
+        val_metrics = evaluate_entity_metrics(
+            model,
+            tokenizer,
+            dev_records,
+            max_length=args.max_length,
+            stride=args.stride,
+            batch_size=args.batch_size,
+            device=device,
+        )
+        epoch_result = {
+            "epoch": epoch,
+            "train": {"loss": train_loss, "exact_span": train_metrics},
+            "val": {"loss": dev_loss, "exact_span": val_metrics},
+            "train_loss": train_loss,
+            "dev_loss": dev_loss,
+        }
+        history.append(epoch_result)
+        print_epoch_metrics(epoch, train_loss, train_metrics, dev_loss, val_metrics)
         if dev_loss < best_dev_loss:
             best_dev_loss = dev_loss
             print("Saving best model...", flush=True)
@@ -373,6 +504,19 @@ def run(args: argparse.Namespace) -> Path:
             ),
             output_dir / "checkpoint.pt",
         )
+        (output_dir / "metrics_history.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "matching": "same hash and exact label/start/end",
+                    "history": history,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         print("Checkpoint saved.", flush=True)
 
     if not model_dir.exists():
@@ -380,6 +524,7 @@ def run(args: argparse.Namespace) -> Path:
 
     run_summary = {
         **baseline_config,
+        "input_train_records": input_train_records,
         "train_records": len(train_records),
         "dev_records": len(dev_records),
         "train_windows": len(train_dataset),
@@ -391,6 +536,7 @@ def run(args: argparse.Namespace) -> Path:
         "weight_decay": args.weight_decay,
         "warmup_ratio": args.warmup_ratio,
         "best_dev_loss": best_dev_loss,
+        "augmentation_stats": augmentation_stats,
         "history": history,
     }
     (output_dir / "training_summary.json").write_text(

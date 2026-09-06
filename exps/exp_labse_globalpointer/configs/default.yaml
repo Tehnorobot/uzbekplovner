@@ -1,20 +1,21 @@
 experiment:
-  name: exp_baseline
+  name: exp_labse_globalpointer
   version: "1.0"
 
 paths:
-  train: data/merged_mendeley_v5/train.jsonl
-  dev: data/merged_mendeley_v5/dev.jsonl
+  train: data/merged_mendeley_uzner_v2_empty75/train.jsonl
+  dev: data/merged_mendeley_uzner_v2_empty75/dev.jsonl
   inference_input: data/test_inputs.jsonl
-  model_dir: exps/exp_baseline/artifacts/model
-  runs_dir: exps/exp_baseline/artifacts/runs
+  model_dir: exps/exp_labse_globalpointer/artifacts/model
+  runs_dir: exps/exp_labse_globalpointer/artifacts/runs
 
 model:
-  name: distilbert/distilbert-base-multilingual-cased
+  name: sentence-transformers/LaBSE
+  dropout: 0.1
 
 training:
   epochs: 3
-  batch_size: 8
+  batch_size: 2
   gradient_accumulation_steps: 8
   learning_rate: 2.0e-5
   weight_decay: 0.01
@@ -25,7 +26,13 @@ training:
   seed: 42
   device: auto
   num_workers: 0
+  use_amp: true
+  evaluate_train_each_epoch: true
   resume: null
+
+global_pointer:
+  head_size: 64
+  threshold: 0.0
 
 augmentation:
   enabled: true
@@ -35,7 +42,7 @@ augmentation:
 
 inference:
   output: null
-  batch_size: 1
+  batch_size: 2
   device: auto
 
 normalization:

@@ -5,6 +5,9 @@ __pycache__
 .pytest_cache
 .ruff_cache
 .env
+artifacts
+data
 exps/*/artifacts/runs
+useful_files
 ТЗ
 tests

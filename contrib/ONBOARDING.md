@@ -22,6 +22,8 @@ cp .env.example .env    # Linux/macOS
 
 Файл `.env` не коммитится. Модельные веса и tokenizer для обучения могут быть
 загружены заранее или указаны локальным путём в конфигурации эксперимента.
+Датасеты также не хранятся в репозитории: локальные пути к train, dev и
+inference JSONL задаются в YAML или через CLI.
 
 ## Быстрый запуск
 
@@ -34,22 +36,27 @@ uv run python main.py --help
 Запустить обучение:
 
 ```bash
-uv run python main.py --exp exp_baseline --stage train
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage train
 ```
+
+После каждой эпохи обучение выводит метрики для `train` и `val`: loss,
+exact-span precision/recall/F1, TP/FP/FN, micro и macro агрегаты. История
+сохраняется в
+`exps/exp_xlmr_large_globalpointer/artifacts/runs/<run>/metrics_history.json`.
 
 Запустить инференс и оценку текущей модели:
 
 ```bash
-uv run python main.py --exp exp_baseline --stage predict
-uv run python main.py --exp exp_baseline --stage evaluate
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage predict
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage evaluate
 ```
 
 Обучение также сохраняет модель конкретного запуска в
-`exps/exp_baseline/artifacts/runs/<run>/model`, а актуальную модель — в
-`exps/exp_baseline/artifacts/model/`.
+`exps/exp_xlmr_large_globalpointer/artifacts/runs/<run>/model`, а актуальную
+модель — в `exps/exp_xlmr_large_globalpointer/artifacts/model/`.
 
 ```bash
-uv run python main.py --exp exp_baseline --stage serve
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage serve
 ```
 
 ## Конфигурация
@@ -68,32 +75,36 @@ uv run python main.py --exp exp_baseline --stage serve
 Пример:
 
 ```bash
-uv run python main.py --exp exp_baseline --stage train \
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage train \
   --set training.epochs=5 \
   --set training.learning_rate=2e-5 \
-  --set training.seed=42
+  --set augmentation.probability=0.2
 ```
+
+Для `exp_xlmr_large_globalpointer` cluster augmentation создаёт дополнительные
+train-записи, заменяя сущности кандидатами того же класса. После замены offsets
+пересчитываются для всех сущностей. Аугментация управляется полями `enabled`,
+`probability`, `num_clusters` и `max_candidates` в секции `augmentation`.
 
 Для возобновления используется checkpoint с состоянием модели, optimizer,
 scheduler и генераторов случайных чисел:
 
 ```bash
-uv run python main.py --exp exp_baseline --stage train \
-  --set training.resume=exps/exp_baseline/artifacts/runs/<run>/checkpoint.pt \
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage train \
+  --set training.resume=exps/exp_xlmr_large_globalpointer/artifacts/runs/<run>/checkpoint.pt \
   --set training.epochs=5
 ```
 
 ## HTTP-проверка
 
-Сервис обязан отвечать на `GET /healthz` и `POST /api/v1/predict`:
+Сервис отвечает на `GET /healthz`, обязательный `POST /api/v1/predict` и
+дополнительный `POST /api/v1/predict/normalized`. Последняя ручка сохраняет
+исходные offsets и добавляет к каждой сущности поля `text` и `normalized`.
+
+Быстрая проверка обязательной ручки:
 
 ```bash
 python scripts/check_service.py --url http://localhost:8000
-python scripts/evaluate_service.py \
-  --url http://localhost:8000 \
-  --gold data/dev.jsonl \
-  --predictions exps/exp_baseline/artifacts/service/dev_predictions.jsonl \
-  --output exps/exp_baseline/artifacts/service/dev_metrics.json
 ```
 
 Перед сохранением ответы проходят общую проверку exact-span контракта: UTF-8,
@@ -104,7 +115,7 @@ Unicode offsets, допустимые labels, порядок hash, дублик�
 Docker-образ собирается после появления локальной модели эксперимента:
 
 ```bash
-docker build --build-arg DEFAULT_EXP=exp_baseline -t ner-uz-solution .
+docker build --build-arg DEFAULT_EXP=exp_xlmr_large_globalpointer -t ner-uz-solution .
 docker run --rm -p 8000:8000 ner-uz-solution
 # Для GPU добавьте к docker run: --gpus all
 ```
