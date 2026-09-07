@@ -41,7 +41,8 @@ Inference-файл содержит только `hash` и `text`:
 ```
 
 Относительные пути разрешаются от корня проекта. Абсолютные пути также
-поддерживаются. Каталог `data/` исключён из Git, данные можно будет скачать по ссылке из google disk.
+поддерживаются. Каталог `data/` исключён из Git; ссылка на архив с данными
+публикуется отдельно.
 
 ## Эксперименты
 
@@ -132,17 +133,168 @@ uv run python main.py --exp exp_xlmr_large_globalpointer --stage train \
 
 Артефакты и веса моделей исключены из Git.
 
-## HTTP API
+## Использование готовых весов
+
+Ниже приведён полный сценарий для эксперимента
+`exp_xlmr_large_globalpointer` (лучший подход по метрике F1 micro). Все команды выполняются из корня репозитория.
+
+### 1. Установка зависимостей
+
+Windows PowerShell:
+
+```powershell
+uv sync
+```
+
+Linux:
+
+```bash
+uv sync
+```
+
+### 2. Загрузка и размещение весов
+
+Скачайте ZIP-архив с обученными весами вручную из
+[папки Google Drive](https://drive.google.com/drive/folders/1RasFIX0KVxZ42TJG7c1CjCjbj95p8HNb?usp=sharing).
+Затем самостоятельно распакуйте его средствами операционной системы или
+архиватора в каталог:
+
+```text
+exps/exp_xlmr_large_globalpointer/artifacts/model/
+```
+
+В этом каталоге должна получиться следующая структура:
+
+```text
+model_config.json
+pointer_state.pt
+encoder/
+  config.json
+  model.safetensors
+tokenizer/
+  tokenizer_config.json
+  tokenizer.json
+  ...
+```
+
+### 3. Запуск HTTP-сервера
+
+Windows PowerShell:
+
+```powershell
+uv run python main.py --exp exp_xlmr_large_globalpointer --stage serve
+```
+
+Linux:
 
 ```bash
 uv run python main.py --exp exp_xlmr_large_globalpointer --stage serve
-python scripts/check_service.py --url http://localhost:8000
 ```
 
-Обязательные endpoints:
+Модель и tokenizer загружаются из каталога
+`exps/exp_xlmr_large_globalpointer/artifacts/model/`. После появления сообщения
+о запуске Uvicorn оставьте этот терминал открытым, а проверки выполняйте во
+втором терминале.
+
+### 4. Проверка состояния сервиса
+
+Windows PowerShell:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8000/healthz"
+```
+
+Linux:
+
+```bash
+curl --request GET "http://localhost:8000/healthz"
+```
+
+Ожидаемый ответ:
+
+```json
+{"status":"ok"}
+```
+
+### 5. Проверка `predict`
+
+Ручка принимает непустой JSON-массив. Каждый объект должен содержать уникальный
+`hash` и исходный `text`:
+
+Windows PowerShell:
+
+```powershell
+$RequestBody = @'
+[
+  {
+    "hash": "example-001",
+    "text": "Aziza Karimova Google kompaniyasida ishlaydi."
+  },
+  {
+    "hash": "example-002",
+    "text": "Ali Toshkentga bordi."
+  }
+]
+'@
+
+$Response = Invoke-RestMethod `
+    -Method Post `
+    -Uri "http://localhost:8000/api/v1/predict" `
+    -ContentType "application/json; charset=utf-8" `
+    -Body ([System.Text.Encoding]::UTF8.GetBytes($RequestBody))
+
+$Response | ConvertTo-Json -Depth 10
+```
+
+Linux:
+
+```bash
+curl --request POST "http://localhost:8000/api/v1/predict" \
+  --header "Content-Type: application/json; charset=utf-8" \
+  --data-binary '[
+    {
+      "hash": "example-001",
+      "text": "Aziza Karimova Google kompaniyasida ishlaydi."
+    },
+    {
+      "hash": "example-002",
+      "text": "Ali Toshkentga bordi."
+    }
+  ]'
+```
+
+Пример ответа корректно обученной модели:
+
+```json
+{
+  "data": [
+    {
+      "hash": "example-001",
+      "entities": [
+        {"label": "NAME", "start": 0, "end": 14},
+        {"label": "ORG", "start": 15, "end": 21}
+      ]
+    },
+    {
+      "hash": "example-002",
+      "entities": [
+        {"label": "NAME", "start": 0, "end": 3},
+        {"label": "GEO", "start": 4, "end": 14}
+      ]
+    }
+  ]
+}
+```
+
+Конкретный набор найденных сущностей зависит от обученных весов. 
+
+## HTTP API
+
+Доступные endpoints:
 
 - `GET /healthz`;
-- `POST /api/v1/predict`.
+- `POST /api/v1/predict`;
+- `POST /api/v1/predict/normalized`.
 
 Запрос `/api/v1/predict` — непустой JSON-массив объектов `hash` и `text`.
 Ответ содержит исходный `hash` и массив exact spans:
